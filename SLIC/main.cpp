@@ -31,37 +31,30 @@ std::vector<unsigned char> B = {
 
 std::vector<int> redrict(65);
 
-typedef PointXYZ PointT;
-typedef PointXYZRGB PointTC;
+typedef PointXYZ	PointT;
+typedef PointXYZRGB	PointTC;
+typedef PointXYZL	PoinTL;
 
-int main()
+int main(int argc,char* argv[])
 {	
-	float s = 0.2f;
-	float m = 1.0f;
-	int samples = 200;
-	float L2_min = 0.05f;
+	float s = 0.02;
+	float m = 2.0f;
+	int samples = 800;
+	float L2_min = 0.1f;
 /*
-	for (int i = 0; i < 13; i++)
-	{
-		for (int j = 0; j < 5; j++)
-		{
-			redrict[i * 13 + j] = j * 13 + i;
-			std::cout << redrict[i * 13 + j] << ' ';
-		}
-	}
+	std::cout << "input s: ";
+	cin >> s;
 	*/
-	
-	
 	//load new point cloud
-	PointCloud<PointT>::Ptr cloud(new PointCloud<PointT>);
-	io::loadPCDFile("C:\\Users\\37952\\Desktop\\desk.pcd", *cloud);
+	PointCloud<PointTC>::Ptr cloud(new PointCloud<PointTC>);
+	io::loadPCDFile("C:\\Users\\37952\\Documents\\toys\\BG003_new.pcd", *cloud);
 
 	//sampling seeds
-	RandomSample<PointT>::Ptr rdm(new RandomSample<PointT>);
+	RandomSample<PointTC>::Ptr rdm(new RandomSample<PointTC>);
 	rdm->setInputCloud(cloud);
 	rdm->setSample(samples);
-	PointCloud<PointT>::Ptr clusteing_center(new PointCloud<PointT>);
-	PointCloud<PointT>::Ptr new_clusteing_center(new PointCloud<PointT>);
+	PointCloud<PointTC>::Ptr clusteing_center(new PointCloud<PointTC>);
+	PointCloud<PointTC>::Ptr new_clusteing_center(new PointCloud<PointTC>);
 	rdm->filter(*clusteing_center);
 	copyPointCloud(*clusteing_center, *new_clusteing_center);
 
@@ -71,7 +64,7 @@ int main()
 	std::vector<float> slic_dist(cloud->width, 1000.0f);
 
 	//sampling 
-	KdTreeFLANN<PointT> kd_tree;
+	KdTreeFLANN<PointTC> kd_tree;
 	kd_tree.setInputCloud(cloud);
 	std::vector<int>search_indices;
 	std::vector<float>point_square_dist;
@@ -88,7 +81,9 @@ int main()
 			float count = 0.0f;
 			for (int j = search_indices.size() - 1; j >= 0; j--)//each point in 2S radius
 			{
-				float dist_color = 0.0f;
+				float dist_color = (*cloud)[search_indices[j]].r*(*cloud)[search_indices[j]].r
+					+ (*cloud)[search_indices[j]].g*(*cloud)[search_indices[j]].g
+					+ (*cloud)[search_indices[j]].b*(*cloud)[search_indices[j]].b;
 				float dist_slic = std::sqrt(dist_color + m * m*point_square_dist[j] / (s*s));
 				if (dist_slic < slic_dist[search_indices[j]])
 				{
@@ -107,7 +102,7 @@ int main()
 		}
 		//compute L2 norm
 		L2 = 0.0f;
-		for (int i = clusteing_center->width - 1; i >= 0; --i)
+		for (int i = clusteing_center->width - 1; i >= 0; i--)
 		{
 			L2 +=	((*new_clusteing_center)[i].x - (*clusteing_center)[i].x)*((*new_clusteing_center)[i].x - (*clusteing_center)[i].x)
 				+	((*new_clusteing_center)[i].y - (*clusteing_center)[i].y)*((*new_clusteing_center)[i].y - (*clusteing_center)[i].y)
@@ -116,34 +111,38 @@ int main()
 		std::cout << "literation done L2= "<<L2 << endl;
 	} while (L2 >= L2_min);
 
-	PointCloud<PointTC>::Ptr labledcloud(new PointCloud<PointTC>);
+	PointCloud<PointTC>::Ptr color_labled_cloud(new PointCloud<PointTC>);
+	PointCloud<PoinTL>::Ptr labledcloud(new PointCloud<PoinTL>);
+	copyPointCloud(*cloud, *color_labled_cloud);
 	copyPointCloud(*cloud, *labledcloud);
-	for (int i = labledcloud->width - 1; i >= 0; --i)
+	for (int i = color_labled_cloud->width - 1; i >= 0; --i)
 	{
 		
-		(*labledcloud)[i].r = R[lable[i] * 65 / samples];
-		(*labledcloud)[i].g = G[lable[i] * 65 / samples];
-		(*labledcloud)[i].b = B[lable[i] * 65 / samples];
+		(*color_labled_cloud)[i].r = R[lable[i] * 65 / samples];
+		(*color_labled_cloud)[i].g = G[lable[i] * 65 / samples];
+		(*color_labled_cloud)[i].b = B[lable[i] * 65 / samples];
+		(*labledcloud)[i].label = lable[i];
+
 	}
 
 
 	std::cout << "done" << std::endl;
-/*
-	for (int i = lable.size() - 1; i >= 0; --i)
-	{
-		cout << (*labledcloud)[i].label << '	';
-		if (!(i % 15)) std::cout << std::endl;
-	}
-	*/
+
 	visualization::PCLVisualizer::Ptr viewer(new visualization::PCLVisualizer("SLIC"));
-	int v1(0), v2(1), v3(2);
-	viewer->createViewPort(0, 0, 0.33, 1, v1);
-	viewer->addPointCloud<PointT>(cloud, "origional cloud", v1);
-	viewer->createViewPort(0.33, 0, 66, 1, v2);
-	viewer->addPointCloud<PointTC>(labledcloud,"labled cloud", v2);
-	viewer->createViewPort(0.66, 0, 1, 1, v3);
-	viewer->addPointCloud<PointT>(clusteing_center, "new cloud", v3);
+	int v1(0), v2(1);
+	viewer->createViewPort(0, 0, 0.5, 1, v1);
+	viewer->addPointCloud<PointTC>(cloud, "origional cloud", v1);
+	viewer->addCoordinateSystem(1.0, "origional cloud", v1);
+	viewer->createViewPort(0.5, 0,1, 1, v2);
+	viewer->addPointCloud<PointTC>(color_labled_cloud,"labled cloud", v2);
+	viewer->addPointCloud<PointTC>(clusteing_center, "clusting center", v2);
+	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5, "clusting center");
+	viewer->addCoordinateSystem(1.0, "labled cloud", v2);
 	viewer->spin();
+	visualization::PCLVisualizer::Ptr viewer1(new visualization::PCLVisualizer("lable"));
+	viewer1->addPointCloud<PoinTL>(labledcloud, "labled");
+	viewer1->spin();
+
 
 	return 0;
 }

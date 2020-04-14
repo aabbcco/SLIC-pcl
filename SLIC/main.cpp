@@ -1,5 +1,6 @@
 #include<pcl/point_cloud.h>
 #include<pcl/filters/random_sample.h>
+#include<pcl/filters/uniform_sampling.h>
 #include<pcl/io/pcd_io.h>
 #include<pcl/visualization/pcl_visualizer.h>
 #include<pcl/kdtree/kdtree_flann.h>
@@ -33,23 +34,24 @@ std::vector<int> redrict(65);
 
 typedef PointXYZ	PointT;
 typedef PointXYZRGB	PointTC;
-typedef PointXYZL	PoinTL;
+typedef PointXYZRGBL	PoinTL;
 
-int main(int argc,char* argv[])
-{	
-	float s = 0.02;
-	float m = 2.0f;
+int main(int argc, char* argv[])
+{
+	float s = 0.1f;
+	float m = 1.0f;
 	int samples = 800;
-	float L2_min = 0.1f;
-/*
-	std::cout << "input s: ";
-	cin >> s;
-	*/
-	//load new point cloud
+	float L2_min = 0.01f;
+	/*
+		std::cout << "input s: ";
+		cin >> s;
+		*/
+		//load new point cloud
 	PointCloud<PointTC>::Ptr cloud(new PointCloud<PointTC>);
-	io::loadPCDFile("C:\\Users\\37952\\Documents\\toys\\BG003_new.pcd", *cloud);
+	io::loadPCDFile("C:\\Users\\37952\\Documents\\toys\\d1_denoise_new.pcd", *cloud);
 
 	//sampling seeds
+	/*
 	RandomSample<PointTC>::Ptr rdm(new RandomSample<PointTC>);
 	rdm->setInputCloud(cloud);
 	rdm->setSample(samples);
@@ -57,6 +59,18 @@ int main(int argc,char* argv[])
 	PointCloud<PointTC>::Ptr new_clusteing_center(new PointCloud<PointTC>);
 	rdm->filter(*clusteing_center);
 	copyPointCloud(*clusteing_center, *new_clusteing_center);
+	*/
+
+	UniformSampling<PointTC>::Ptr filter(new UniformSampling<PointTC>);
+
+	filter->setInputCloud(cloud);
+	filter->setRadiusSearch(0.05f);
+	PointCloud<PointTC>::Ptr clusteing_center(new PointCloud<PointTC>);
+	PointCloud<PointTC>::Ptr new_clusteing_center(new PointCloud<PointTC>);
+	filter->filter(*clusteing_center);
+	copyPointCloud(*clusteing_center, *new_clusteing_center);
+	
+	std::cout << "number of seed: " << clusteing_center->width << std::endl;
 
 
 
@@ -69,6 +83,7 @@ int main(int argc,char* argv[])
 	std::vector<int>search_indices;
 	std::vector<float>point_square_dist;
 	float x, y, z,L2;
+	float count = 0.0f;
 	do
 	{
 		copyPointCloud(*new_clusteing_center, *clusteing_center);
@@ -78,7 +93,7 @@ int main(int argc,char* argv[])
 			point_square_dist.clear();
 			kd_tree.radiusSearch((*clusteing_center)[i], 2 * s, search_indices, point_square_dist, 0);
 			x = y = z = 0; //clear x,y,z
-			float count = 0.0f;
+			count = 0.0f;
 			for (int j = search_indices.size() - 1; j >= 0; j--)//each point in 2S radius
 			{
 				float dist_color = (*cloud)[search_indices[j]].r*(*cloud)[search_indices[j]].r
@@ -96,9 +111,12 @@ int main(int argc,char* argv[])
 				}
 			}
 			//compute new seed
-			(*new_clusteing_center)[i].x = x / count;
-			(*new_clusteing_center)[i].y = y / count;
-			(*new_clusteing_center)[i].z = z / count;
+			if (count != 0)
+			{
+				(*new_clusteing_center)[i].x = x / count;
+				(*new_clusteing_center)[i].y = y / count;
+				(*new_clusteing_center)[i].z = z / count;
+			}
 		}
 		//compute L2 norm
 		L2 = 0.0f;
@@ -111,16 +129,16 @@ int main(int argc,char* argv[])
 		std::cout << "literation done L2= "<<L2 << endl;
 	} while (L2 >= L2_min);
 
-	PointCloud<PointTC>::Ptr color_labled_cloud(new PointCloud<PointTC>);
+	PointCloud<PointXYZRGB>::Ptr color_labled_cloud(new PointCloud<PointTC>);
 	PointCloud<PoinTL>::Ptr labledcloud(new PointCloud<PoinTL>);
 	copyPointCloud(*cloud, *color_labled_cloud);
 	copyPointCloud(*cloud, *labledcloud);
 	for (int i = color_labled_cloud->width - 1; i >= 0; --i)
 	{
 		
-		(*color_labled_cloud)[i].r = R[lable[i] * 65 / samples];
-		(*color_labled_cloud)[i].g = G[lable[i] * 65 / samples];
-		(*color_labled_cloud)[i].b = B[lable[i] * 65 / samples];
+		(*color_labled_cloud)[i].r = R[lable[i] * 65 / clusteing_center->width];
+		(*color_labled_cloud)[i].g = G[lable[i] * 65 / clusteing_center->width];
+		(*color_labled_cloud)[i].b = B[lable[i] * 65 / clusteing_center->width];
 		(*labledcloud)[i].label = lable[i];
 
 	}
@@ -129,20 +147,32 @@ int main(int argc,char* argv[])
 	std::cout << "done" << std::endl;
 
 	visualization::PCLVisualizer::Ptr viewer(new visualization::PCLVisualizer("SLIC"));
-	int v1(0), v2(1);
-	viewer->createViewPort(0, 0, 0.5, 1, v1);
+	int v1(0), v2(1),v3(2);
+	viewer->createViewPort(0, 0, 0.33, 1, v1);
 	viewer->addPointCloud<PointTC>(cloud, "origional cloud", v1);
-	viewer->addCoordinateSystem(1.0, "origional cloud", v1);
-	viewer->createViewPort(0.5, 0,1, 1, v2);
-	viewer->addPointCloud<PointTC>(color_labled_cloud,"labled cloud", v2);
-	viewer->addPointCloud<PointTC>(clusteing_center, "clusting center", v2);
-	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5, "clusting center");
-	viewer->addCoordinateSystem(1.0, "labled cloud", v2);
+	viewer->createViewPort(0.33, 0,0.66, 1, v2);
+	viewer->addPointCloud<PointXYZRGB>(color_labled_cloud,"labled cloud", v2);
+	viewer->createViewPort(0.66, 0, 1, 1, v2);
+	viewer->addPointCloud<PointTC>(clusteing_center, "center", v3);
+	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5, "origional cloud", v1);
+	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5, "labled cloud", v2);
+	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5, "center", v3);
+
+	PointCloud<PointT>::Ptr center(new PointCloud<PointT>);
+	copyPointCloud(*clusteing_center, *center);
+	viewer->addPointCloud<PointT>(center, "clusting center", v2);
+	viewer->addPointCloud<PointT>(center, "clusting center1", v1);
+	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "clusting center");
+	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "clusting center1");
+	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 1, "clusting center1");
 	viewer->spin();
-	visualization::PCLVisualizer::Ptr viewer1(new visualization::PCLVisualizer("lable"));
-	viewer1->addPointCloud<PoinTL>(labledcloud, "labled");
-	viewer1->spin();
+//	visualization::PCLVisualizer::Ptr viewer1(new visualization::PCLVisualizer("lable"));
+//	viewer1->addPointCloud<PoinTL>(labledcloud, "labled");
+//	viewer1->spin();
+
+	io::savePCDFileASCII("data.pcd", *labledcloud);
 
 
 	return 0;
 }
+

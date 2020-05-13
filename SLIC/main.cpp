@@ -9,101 +9,151 @@
 #include<cmath>
 #include<random>
 
-using namespace pcl;
+template<typename PointTT>
+class SLIC
+{
+public:
+//	constructor/deconstructor
+	SLIC() {};
+	SLIC(const typename pcl::PointCloud<PointTT>::Ptr &cloud, float m = 1.0f, float s = 1.0f, float L2_min = 1.0f) :m(m), s(s), L2_min(L2_min)
+	{
+		this->cloud = cloud;
+	};
+	~SLIC() {};
 
-std::vector<unsigned char> R = { 
-	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-	240, 220, 200, 180, 160, 140, 120, 100, 80, 60, 40, 20, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240 };
-std::vector<unsigned char> G = { 
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240,
-	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
-std::vector<unsigned char> B = { 
-	0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240,
-	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-	240, 220, 200, 180, 160, 140, 120, 100, 80, 60, 40, 20, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	//socket in
+	void setM(float m)
+	{
+		this->m = m;
+	}
+	void setS(float s)
+	{
+		this->s = s;
+	}
+	void setL2_min(float L2_min)
+	{
+		this->L2_min = L2_min;
+	}
+	void setInputCloud(pcl::PointCloud<PointTT> &cloud)
+	{
+		this->cloud = cloud;
+	}
+	//socket out
+	float getM() { return m; }
+	float getS() { return s; }
+	float geL2_min() { return L2_min; }
 
-std::vector<int> redrict(65);
+	void getSeed(const typename pcl::PointCloud<PointTT>::Ptr &seed);
+	void getLabledCloud(const pcl::PointCloud<pcl::PointXYZL>::Ptr &result);
+	void getLabledCloud(const pcl::PointCloud<pcl::PointXYZRGBL>::Ptr &result);
+	//actions
+	void SLIC_superpointcloudclusting();
 
-typedef PointXYZ	PointT;
-typedef PointXYZRGB	PointTC;
-typedef PointXYZRGBL	PoinTL;
+private:
+	float m;
+	float s;
+	float L2_min;
+
+	typename pcl::PointCloud<PointTT>::ConstPtr cloud;
+	typename pcl::PointCloud<PointTT>::ConstPtr seed;
+
+	float Calculate_SLIC_dist(const PointTT &cloud, float sp_dist);
+
+	void filterClustingSeed();
+
+	std::vector<int> label;
+};
+
+
+
+typedef pcl::PointXYZ	PointT;
+typedef pcl::PointXYZRGB	PointTC;
+typedef pcl::PointXYZL		PoinTL;
+
+
 
 int main(int argc, char* argv[])
 {
 	float s = 0.1f;
-	float m = 1.0f;
-	int samples = 800;
-	float L2_min = 0.01f;
-	/*
-		std::cout << "input s: ";
-		cin >> s;
-		*/
-		//load new point cloud
-	PointCloud<PointTC>::Ptr cloud(new PointCloud<PointTC>);
-	io::loadPCDFile("C:\\Users\\37952\\Documents\\toys\\d1_denoise_new.pcd", *cloud);
+	float m = 0.5f;
+	//int samples = 800;
+	float L2_min = 1.0f;
 
-	//sampling seeds
-	/*
-	RandomSample<PointTC>::Ptr rdm(new RandomSample<PointTC>);
-	rdm->setInputCloud(cloud);
-	rdm->setSample(samples);
-	PointCloud<PointTC>::Ptr clusteing_center(new PointCloud<PointTC>);
-	PointCloud<PointTC>::Ptr new_clusteing_center(new PointCloud<PointTC>);
-	rdm->filter(*clusteing_center);
-	copyPointCloud(*clusteing_center, *new_clusteing_center);
-	*/
+	pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>);
+	pcl::io::loadPCDFile("C:\\Users\\37952\\Documents\\toys\\d1_denoise_new.pcd", *cloud);
 
-	UniformSampling<PointTC>::Ptr filter(new UniformSampling<PointTC>);
+	pcl::PointCloud<PointT>::Ptr clusting_center(new pcl::PointCloud<PointT>);
+	pcl::PointCloud<pcl::PointXYZL>::Ptr labledcloud(new pcl::PointCloud<pcl::PointXYZL>);
 
-	filter->setInputCloud(cloud);
-	filter->setRadiusSearch(0.05f);
-	PointCloud<PointTC>::Ptr clusteing_center(new PointCloud<PointTC>);
-	PointCloud<PointTC>::Ptr new_clusteing_center(new PointCloud<PointTC>);
-	filter->filter(*clusteing_center);
-	copyPointCloud(*clusteing_center, *new_clusteing_center);
+	SLIC<pcl::PointXYZ> clusting(cloud,0.5f,0.1f,0.01f);
+	clusting.SLIC_superpointcloudclusting();
+	clusting.getLabledCloud(labledcloud);
+	clusting.getSeed(clusting_center);
 	
-	std::cout << "number of seed: " << clusteing_center->width << std::endl;
+
+	pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("SLIC"));
+	int v1(0), v2(1),v3(2);
+	viewer->createViewPort(0, 0, 0.5, 1, v1);
+	viewer->addPointCloud(cloud, "origional cloud", v1);
+	viewer->createViewPort(0.5, 0,1, 1, v2);
+	viewer->addPointCloud(labledcloud,"labled cloud", v2);
+	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "origional cloud", v1);
+	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "labled cloud", v2);
+	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_OPACITY, 0.5, "labled cloud", v2);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr center(new pcl::PointCloud<pcl::PointXYZ>);
+	
+	pcl::copyPointCloud(*clusting_center, *center);
+	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> single_color(center, 255, 255, 255);
+	viewer->addPointCloud<pcl::PointXYZ>(center, "clusting center1", v2);
+	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "clusting center1");
+	
+	viewer->spin();
+
+	return 0;
+}
 
 
 
-	std::vector<int> lable(cloud->width);
+
+
+
+template<typename PointTT>
+void SLIC<PointTT>::SLIC_superpointcloudclusting()
+{
+	std::cout << "clusting start" << std::endl;
+	float x, y, z, L2;
+	float count = 0.0f;
 	std::vector<float> slic_dist(cloud->width, 1000.0f);
-
-	//sampling 
-	KdTreeFLANN<PointTC> kd_tree;
-	kd_tree.setInputCloud(cloud);
+	typename pcl::PointCloud<PointTT>::Ptr clusting_center(new pcl::PointCloud<PointTT>);
+	typename pcl::PointCloud<PointTT>::Ptr new_clusting_center(new pcl::PointCloud<PointTT>);
+	filterClustingSeed();
+	pcl::copyPointCloud(*seed, *new_clusting_center);
 	std::vector<int>search_indices;
 	std::vector<float>point_square_dist;
-	float x, y, z,L2;
-	float count = 0.0f;
+
+	pcl::KdTreeFLANN<PointTT> kd_tree;
+	kd_tree.setInputCloud(cloud);
+
 	do
 	{
-		copyPointCloud(*new_clusteing_center, *clusteing_center);
-		for (int i = clusteing_center->width - 1; i >= 0; i--)//each seed point
+		label = std::vector<int>(cloud->width, 0);
+		slic_dist = std::vector<float>(cloud->width, 1000.0f);
+		pcl::copyPointCloud(*new_clusting_center, *clusting_center);
+		for (int i = clusting_center->width - 1; i >= 0; i--)//each seed point
 		{
 			search_indices.clear();
 			point_square_dist.clear();
-			kd_tree.radiusSearch((*clusteing_center)[i], 2 * s, search_indices, point_square_dist, 0);
-			x = y = z = 0; //clear x,y,z
+			kd_tree.radiusSearch((*clusting_center)[i], 2 * s, search_indices, point_square_dist, 0);
+			x = y = z = 0.0f; //clear x,y,z
 			count = 0.0f;
 			for (int j = search_indices.size() - 1; j >= 0; j--)//each point in 2S radius
 			{
-				float dist_color = (*cloud)[search_indices[j]].r*(*cloud)[search_indices[j]].r
-					+ (*cloud)[search_indices[j]].g*(*cloud)[search_indices[j]].g
-					+ (*cloud)[search_indices[j]].b*(*cloud)[search_indices[j]].b;
-				float dist_slic = std::sqrt(dist_color + m * m*point_square_dist[j] / (s*s));
+				float dist_slic = Calculate_SLIC_dist((*cloud)[search_indices[j]], point_square_dist[j]);
+
 				if (dist_slic < slic_dist[search_indices[j]])
 				{
 					slic_dist[search_indices[j]] = dist_slic;
-					lable[search_indices[j]] = i;
+					label[search_indices[j]] = i;
 					x += (*cloud)[search_indices[j]].x;
 					y += (*cloud)[search_indices[j]].y;
 					z += (*cloud)[search_indices[j]].z;
@@ -113,66 +163,70 @@ int main(int argc, char* argv[])
 			//compute new seed
 			if (count != 0)
 			{
-				(*new_clusteing_center)[i].x = x / count;
-				(*new_clusteing_center)[i].y = y / count;
-				(*new_clusteing_center)[i].z = z / count;
+				(*new_clusting_center)[i].x = x / count;
+				(*new_clusting_center)[i].y = y / count;
+				(*new_clusting_center)[i].z = z / count;
 			}
 		}
 		//compute L2 norm
 		L2 = 0.0f;
-		for (int i = clusteing_center->width - 1; i >= 0; i--)
+		for (int i = clusting_center->width - 1; i >= 0; i--)
 		{
-			L2 +=	((*new_clusteing_center)[i].x - (*clusteing_center)[i].x)*((*new_clusteing_center)[i].x - (*clusteing_center)[i].x)
-				+	((*new_clusteing_center)[i].y - (*clusteing_center)[i].y)*((*new_clusteing_center)[i].y - (*clusteing_center)[i].y)
-				+	((*new_clusteing_center)[i].z - (*clusteing_center)[i].z)*((*new_clusteing_center)[i].z - (*clusteing_center)[i].z);
+			L2 += ((*new_clusting_center)[i].x - (*clusting_center)[i].x)*((*new_clusting_center)[i].x - (*clusting_center)[i].x)
+				+ ((*new_clusting_center)[i].y - (*clusting_center)[i].y)*((*new_clusting_center)[i].y - (*clusting_center)[i].y)
+				+ ((*new_clusting_center)[i].z - (*clusting_center)[i].z)*((*new_clusting_center)[i].z - (*clusting_center)[i].z);
 		}
-		std::cout << "literation done L2= "<<L2 << endl;
+		std::cout << "literation done,L2= " << L2 << std::endl;
 	} while (L2 >= L2_min);
-
-	PointCloud<PointXYZRGB>::Ptr color_labled_cloud(new PointCloud<PointTC>);
-	PointCloud<PoinTL>::Ptr labledcloud(new PointCloud<PoinTL>);
-	copyPointCloud(*cloud, *color_labled_cloud);
-	copyPointCloud(*cloud, *labledcloud);
-	for (int i = color_labled_cloud->width - 1; i >= 0; --i)
-	{
-		
-		(*color_labled_cloud)[i].r = R[lable[i] * 65 / clusteing_center->width];
-		(*color_labled_cloud)[i].g = G[lable[i] * 65 / clusteing_center->width];
-		(*color_labled_cloud)[i].b = B[lable[i] * 65 / clusteing_center->width];
-		(*labledcloud)[i].label = lable[i];
-
-	}
-
-
-	std::cout << "done" << std::endl;
-
-	visualization::PCLVisualizer::Ptr viewer(new visualization::PCLVisualizer("SLIC"));
-	int v1(0), v2(1),v3(2);
-	viewer->createViewPort(0, 0, 0.33, 1, v1);
-	viewer->addPointCloud<PointTC>(cloud, "origional cloud", v1);
-	viewer->createViewPort(0.33, 0,0.66, 1, v2);
-	viewer->addPointCloud<PointXYZRGB>(color_labled_cloud,"labled cloud", v2);
-	viewer->createViewPort(0.66, 0, 1, 1, v2);
-	viewer->addPointCloud<PointTC>(clusteing_center, "center", v3);
-	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5, "origional cloud", v1);
-	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5, "labled cloud", v2);
-	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 5, "center", v3);
-
-	PointCloud<PointT>::Ptr center(new PointCloud<PointT>);
-	copyPointCloud(*clusteing_center, *center);
-	viewer->addPointCloud<PointT>(center, "clusting center", v2);
-	viewer->addPointCloud<PointT>(center, "clusting center1", v1);
-	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "clusting center");
-	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_POINT_SIZE, 2, "clusting center1");
-	viewer->setPointCloudRenderingProperties(visualization::PCL_VISUALIZER_COLOR, 1, "clusting center1");
-	viewer->spin();
-//	visualization::PCLVisualizer::Ptr viewer1(new visualization::PCLVisualizer("lable"));
-//	viewer1->addPointCloud<PoinTL>(labledcloud, "labled");
-//	viewer1->spin();
-
-	io::savePCDFileASCII("data.pcd", *labledcloud);
-
-
-	return 0;
+	std::cout << "clusting done!" << std::endl;
 }
 
+template <> float SLIC<pcl::PointXYZRGB>::Calculate_SLIC_dist(const pcl::PointXYZRGB &cloud, float sp_dist)
+{
+	float c_dist = cloud.r*cloud.r + cloud.g*cloud.g + cloud.b*cloud.b;
+	return std::sqrt(c_dist + m * m*sp_dist / (s*s));
+}
+
+template <> float SLIC<pcl::PointXYZ>::Calculate_SLIC_dist(const pcl::PointXYZ &cloud, float sp_dist)
+{
+	return std::sqrt(sp_dist)*m/s;
+}
+
+
+template<typename PointTT>
+void SLIC<PointTT>::filterClustingSeed()
+{
+	typename pcl::UniformSampling<PointTT>::Ptr filter(new pcl::UniformSampling<PointTT>);
+	typename pcl::PointCloud<PointTT>::Ptr seeds(new pcl::PointCloud<PointTT>);
+	//std::cout << "filter start" << std::endl;
+	filter->setInputCloud(cloud);
+	filter->setRadiusSearch(s);
+	filter->filter(*seeds);
+	seed = seeds;
+	std::cout << "number of seed: " << seed->width << std::endl;
+}
+
+template<typename PointTT>
+void SLIC<PointTT>::getLabledCloud(const pcl::PointCloud<pcl::PointXYZL>::Ptr &result)
+{
+	copyPointCloud(*cloud, *result);
+	for (int i = result->width - 1; i >= 0; --i)
+	{
+		(*result)[i].label = label[i];
+	}
+}
+
+template<typename PointTT>
+void SLIC<PointTT>::getLabledCloud(const pcl::PointCloud<pcl::PointXYZRGBL>::Ptr &result)
+{
+	copyPointCloud(*cloud, *result);
+	for (int i = result->width - 1; i >= 0; --i)
+	{
+		(*result)[i].label = label[i];
+	}
+}
+template<typename PointTT>
+void SLIC<PointTT>::getSeed(const typename pcl::PointCloud<PointTT>::Ptr &seed)
+{
+	pcl::copyPointCloud(*(this->seed), *seed);
+}

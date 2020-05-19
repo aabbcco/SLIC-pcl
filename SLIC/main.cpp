@@ -71,7 +71,7 @@ typedef pcl::PointXYZL		PoinTL;
 
 int main(int argc, char* argv[])
 {
-	float s = 20.0f;
+	float s = 10.0f;
 	float m = 1.0f;
 	//int samples = 800;
 	float L2_min = 10.0f;
@@ -122,17 +122,24 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 	std::cout << "clusting start" << std::endl;
 	float x, y, z, L2;
 	float count = 0.0f;
-	std::vector<float> slic_dist(cloud->width, 1000.0f);
-	typename pcl::PointCloud<PointTT>::Ptr clusting_center(new pcl::PointCloud<PointTT>);
-	typename pcl::PointCloud<PointTT>::Ptr new_clusting_center(new pcl::PointCloud<PointTT>);
+	std::vector<float> slic_dist(cloud->width, 1000.0f);										//slic dist to be compared
+	typename pcl::PointCloud<PointTT>::Ptr clusting_center(new pcl::PointCloud<PointTT>);		//center of each superpixel
+	typename pcl::PointCloud<PointTT>::Ptr new_clusting_center(new pcl::PointCloud<PointTT>);	//to calculate L2 norm
 	filterClustingSeed();
 	pcl::copyPointCloud(*seed, *new_clusting_center);
-	std::vector<int>search_indices;
+	
+	std::vector<int>search_indices;				//for K-nearst search
+	std::vector<int>::iterator search_iter;
+
 	std::vector<float>point_square_dist;
+	std::vector<float>::iterator square_dist_iter;
+	
 
 	pcl::KdTreeFLANN<PointTT> kd_tree;
 	kd_tree.setInputCloud(cloud);
 	DWORD time,time_end;
+
+	//SLIC step down here
 	do
 	{
 		time = GetTickCount();
@@ -142,22 +149,26 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 		
 		for (int i = clusting_center->width - 1; i >= 0; i--)//each seed point
 		{
+			//find each point in 2S radius
 			search_indices.clear();
 			point_square_dist.clear();
 			kd_tree.radiusSearch((*clusting_center)[i], 2 * s, search_indices, point_square_dist, 0);
 			x = y = z = 0.0f; //clear x,y,z
 			count = 0.0f;
-			for (int j = search_indices.size() - 1; j >= 0; j--)//each point in 2S radius
-			{
-				float dist_slic = Calculate_SLIC_dist((*cloud)[search_indices[j]], point_square_dist[j]);
+			square_dist_iter = point_square_dist.begin();
 
-				if (dist_slic < slic_dist[search_indices[j]])
+			for (search_iter=search_indices.begin();search_iter!=search_indices.end(); search_iter++)//each point in 2S radius
+			{
+				float dist_slic = Calculate_SLIC_dist((*cloud)[*search_iter], *square_dist_iter);
+				square_dist_iter++;
+
+				if (dist_slic < slic_dist[*search_iter])
 				{
-					slic_dist[search_indices[j]] = dist_slic;
-					label[search_indices[j]] = i;
-					x += (*cloud)[search_indices[j]].x;
-					y += (*cloud)[search_indices[j]].y;
-					z += (*cloud)[search_indices[j]].z;
+					slic_dist[*search_iter] = dist_slic;
+					label[*search_iter] = i;
+					x += (*cloud)[*search_iter].x;
+					y += (*cloud)[*search_iter].y;
+					z += (*cloud)[*search_iter].z;
 					count += 1.0f;
 				}
 			}
@@ -169,7 +180,8 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 				(*new_clusting_center)[i].z = z / count;
 			}
 		}
-		//compute L2 norm
+		//compute L2 norm and SLIC time
+		time_end = GetTickCount();
 		L2 = 0.0f;
 		for (int i = clusting_center->width - 1; i >= 0; i--)
 		{
@@ -177,10 +189,10 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 				+ ((*new_clusting_center)[i].y - (*clusting_center)[i].y)*((*new_clusting_center)[i].y - (*clusting_center)[i].y)
 				+ ((*new_clusting_center)[i].z - (*clusting_center)[i].z)*((*new_clusting_center)[i].z - (*clusting_center)[i].z);
 		}
-		time_end = GetTickCount();
 		std::cout << "literation done,L2= " << L2 <<"!! using time: "<<int(time_end-time)<<"ms"<< std::endl;		
 	} while (L2 >= L2_min);
 	seed = new_clusting_center;
+	//just to show that its done
 	std::cout << "clusting done!" << std::endl;
 
 }
@@ -197,6 +209,7 @@ template <> float SLIC<pcl::PointXYZRGBL>::Calculate_SLIC_dist(const pcl::PointX
 	return std::sqrt(c_dist + m * m*sp_dist / (s*s));
 }
 
+//if there is some difference with m or without m?
 template <> float SLIC<pcl::PointXYZ>::Calculate_SLIC_dist(const pcl::PointXYZ &cloud, float sp_dist)
 {
 	return std::sqrt(sp_dist)*m/s;
@@ -253,7 +266,10 @@ float Cal_undersegmentation_error(const PointTT a, const PointTT gt,const int cl
 	std::vector < std::vector<int> > hashmap(classcount, std::vector<int>());
 	std::vector<int> label_count(classcount,0);
 	std::vector<int> pixel_count(supercount, 0);
-	float userr = 0;
+	std::vector<int> label_pixel(classcount, 0);
+	std::vector<std::vector<int>>::iterator lit1;
+	std::vector<int>::iterator lit2;
+	int errcount = 0;
 
 	for (int i = classcount - 1; i >= 0; --i)
 	{
@@ -273,28 +289,18 @@ float Cal_undersegmentation_error(const PointTT a, const PointTT gt,const int cl
 	//count superpixels
 	if (is_new)
 	{
-		std::vector<int> label_pixel(classcount, 0);
-		std::vector<std::vector<int>>::iterator lit1;
-		std::vector<int>::iterator lit2;
 		for (lit1 = hashmap.begin(); lit1 != hashmap.end(); lit1++)
 		{
 			for (lit2 = lit1->begin(); lit2 != lit1->end(); lit2++)
 			{
-				if ((*lit2) != 0)
-				{
-					//add smaller part(orig or outline) into count
-					if ((*lit2) != 0) label_pixel[distance(hashmap.begin(), lit1)] += std::min(pixel_count[distance(lit1->begin(), lit2)]-*lit2,*lit2);
-				}
+				//add smaller part(orig or outline) into count
+				if ((*lit2) != 0) label_pixel[distance(hashmap.begin(), lit1)] += std::min(pixel_count[distance(lit1->begin(), lit2)]-*lit2,*lit2);
 			}
 		}
-		int errcount = std::accumulate(label_pixel.begin(), label_pixel.end(), 0);
-		userr = float(errcount) / float(gt->width);
+		errcount = std::accumulate(label_pixel.begin(), label_pixel.end(), 0);
 	}
 	else
 	{
-		std::vector<int> label_pixel(classcount, 0);
-		std::vector<std::vector<int>>::iterator lit1;
-		std::vector<int>::iterator lit2;
 		for (lit1 = hashmap.begin(); lit1 != hashmap.end(); lit1++)
 		{
 			for (lit2 = lit1->begin(); lit2 != lit1->end(); lit2++)
@@ -303,8 +309,7 @@ float Cal_undersegmentation_error(const PointTT a, const PointTT gt,const int cl
 				if ((*lit2) != 0) label_pixel[distance(hashmap.begin(), lit1)] += pixel_count[distance(lit1->begin(), lit2)];
 			}
 		}
-		int errcount = std::accumulate(label_pixel.begin(), label_pixel.end(), 0) - gt->width;
-		userr = float(errcount) / float(gt->width);
+		errcount = std::accumulate(label_pixel.begin(), label_pixel.end(), 0) - gt->width;
 	}
-	return userr;
+	return float(errcount) / float(gt->width);
 }

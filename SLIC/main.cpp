@@ -1,5 +1,4 @@
 #include<pcl/point_cloud.h>
-#include<pcl/filters/random_sample.h>
 #include<pcl/filters/uniform_sampling.h>
 #include<pcl/io/pcd_io.h>
 #include<pcl/visualization/pcl_visualizer.h>
@@ -11,6 +10,9 @@
 #include<random>
 #include<ctime>
 #include <numeric>
+#include<boost/program_options.hpp>
+
+namespace po = boost::program_options;
 
 template<typename PointTT>
 class SLIC
@@ -75,6 +77,35 @@ int main(int argc, char* argv[])
 	float m = 1.0f;
 	//int samples = 800;
 	float L2_min = 10.0f;
+
+	//argparse
+	po::options_description opts("All opts");
+	po::variables_map vm;
+	opts.add_options()
+		("s", po::value<float>(), "Filtering and search radius s")
+		("m", po::value<float>(), "Spital importance m")
+		("l2",po::value<float>(),"minium L2 loss")
+		("help", "SLIC like Superpixel using PCL Library");
+	try
+	{
+		po::store(po::parse_command_line(argc, argv, opts), vm);
+	}
+	catch (...)
+	{
+		std::cout << "wrong input" << endl;
+		return -1;
+	}
+
+	if (vm.count("s")) s = vm["s"].as<float>();
+	if (vm.count("m")) m = vm["m"].as<float>();
+	if (vm.count("l2")) L2_min = vm["l2"].as<float>();
+	if (vm.count("help"))
+	{
+		std::cout << opts << std::endl;
+		return 0;
+	}
+
+	std::cout << "SLIC step using s=" << s << " m=" << m << " L2 min=" << L2_min << std::endl;
 
 	pcl::PointCloud<PoinTL>::Ptr cloud(new pcl::PointCloud<PoinTL>);
 	pcl::io::loadPCDFile("C:\\Users\\37952\\Desktop\\000_orig_pcd\\benthi_control_A_D30_centre_filter.pcd", *cloud);

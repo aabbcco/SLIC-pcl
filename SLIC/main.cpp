@@ -65,6 +65,9 @@ private:
 template<typename PointTT>
 float Cal_undersegmentation_error(const PointTT a, const PointTT gt, int classcount, int supercount,bool is_new=false);
 
+template<typename PointTT>
+float Cal_Achievable_seg_acc(const PointTT a, const PointTT gt, const int classcount, const int supercount);
+
 typedef pcl::PointXYZ	PointT;
 typedef pcl::PointXYZRGB	PointTC;
 typedef pcl::PointXYZL		PoinTL;
@@ -75,7 +78,6 @@ int main(int argc, char* argv[])
 {
 	float s = 10.0f;
 	float m = 1.0f;
-	//int samples = 800;
 	float L2_min = 10.0f;
 
 	//argparse
@@ -119,8 +121,9 @@ int main(int argc, char* argv[])
 	clusting.getSeed(clusting_center);
 	
 	float error = Cal_undersegmentation_error(labledcloud, cloud, 26, clusting.getSuperpixelCount(),true);
+	float asa = Cal_Achievable_seg_acc(labledcloud, cloud, 26, clusting.getSuperpixelCount());
 
-	std::cout << "Under-segmentation error is: " << error << std::endl;
+	std::cout << "Under-segmentation error is: " << error <<" ASA: "<<asa<< std::endl;
 
 	pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("SLIC"));
 	int v1(0), v2(1),v3(2);
@@ -304,7 +307,7 @@ float Cal_undersegmentation_error(const PointTT a, const PointTT gt,const int cl
 
 	for (int i = classcount - 1; i >= 0; --i)
 	{
-		hashmap[i].resize(supercount,false);
+		hashmap[i].resize(supercount,0);
 	}
 
 	//find superpixel that covers the correspond label
@@ -343,4 +346,28 @@ float Cal_undersegmentation_error(const PointTT a, const PointTT gt,const int cl
 		errcount = std::accumulate(label_pixel.begin(), label_pixel.end(), 0) - gt->width;
 	}
 	return float(errcount) / float(gt->width);
+}
+
+
+template<typename PointTT>
+float Cal_Achievable_seg_acc(const PointTT a, const PointTT gt, const int classcount, const int supercount)
+{
+	std::vector<std::vector<int>> hashmap(supercount, std::vector<int>(classcount,0));
+	std::vector<std::vector<int>>::iterator lit;
+	std::vector<int> classpred(classcount,0);
+	std::vector<int> classgt(classcount,0);
+
+	for (int i = gt->width - 1; i >= 0; --i)
+	{
+		hashmap[(*a)[i].label][(*gt)[i].label] += 1;
+		classgt[(*gt)[i].label] += 1;
+	}
+
+	for (lit = hashmap.begin(); lit != hashmap.end(); lit++)
+	{
+		auto maxpos = std::max_element(lit->begin(), lit->end());
+		classpred[maxpos - lit->begin()] += *maxpos;
+	}
+
+	return float(std::accumulate(classpred.begin(), classpred.end(), 0)) / float(std::accumulate(classgt.begin(), classgt.end(), 0));
 }

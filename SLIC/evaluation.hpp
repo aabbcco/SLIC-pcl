@@ -8,10 +8,25 @@
 
 #ifndef _POINTPIXEL_VAL
 #define _POINTPIXEL_VAL
+
+
+template<typename PointTT>
+int getlabelcount(PointTT a)
+{
+	int maxcount = 0;
+	for (int i = a->width; i >= 0; i--)
+	{
+		if (maxcount < a->points[i].label) maxcount = a->points[i].label;
+	}
+	return maxcount + 1;
+}
+
 template<typename PointTT>
 
-float Cal_undersegmentation_error(const PointTT a, const PointTT gt, const int classcount, const int supercount, bool is_new)
+float Cal_undersegmentation_error(const PointTT a, const PointTT gt,bool is_new=true)
 {
+	int supercount = getlabelcount(a);
+	int classcount = getlabelcount(gt);
 	//init hashmap
 	std::vector < std::vector<int> > hashmap(classcount, std::vector<int>());
 	std::vector<int> label_count(classcount, 0);
@@ -66,8 +81,11 @@ float Cal_undersegmentation_error(const PointTT a, const PointTT gt, const int c
 
 
 template<typename PointTT>
-float Cal_Achievable_seg_acc(const PointTT a, const PointTT gt, const int classcount, const int supercount)
+float Cal_Achievable_seg_acc(const PointTT a, const PointTT gt)
 {
+	int supercount = getlabelcount(a);
+	int classcount = getlabelcount(gt);
+
 	std::vector<std::vector<int>> hashmap(supercount, std::vector<int>(classcount, 0));
 	std::vector<std::vector<int>>::iterator lit;
 	std::vector<int> classpred(classcount, 0);
@@ -87,6 +105,7 @@ float Cal_Achievable_seg_acc(const PointTT a, const PointTT gt, const int classc
 
 	return float(std::accumulate(classpred.begin(), classpred.end(), 0)) / float(std::accumulate(classgt.begin(), classgt.end(), 0));
 }
+
 
 #endif // !_POINTPIXEL_VAL
 

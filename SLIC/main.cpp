@@ -7,6 +7,7 @@
 #include<iostream>
 #include<cmath>
 #include<random>
+#include<string>
 #include<boost/program_options.hpp>
 
 #include "evaluation.hpp"
@@ -26,18 +27,21 @@ int main(int argc, char* argv[])
 	float s = 10.0f;
 	float m = 1.0f;
 	float L2_min = 10.0f;
+	std::string dataroot;
 
 	//argparse
 	po::options_description opts("All opts");
 	po::variables_map vm;
 	opts.add_options()
-		("s", po::value<float>()->default_value(10.0f), "Filtering and search radius s")
-		("m", po::value<float>()->default_value(1.0f), "Spital importance m")
-		("l2",po::value<float>()->default_value(10.0f),"minium L2 loss")
-		("help", "SLIC like Superpixel using PCL Library");
+		("search,s", po::value<float>(&s)->default_value(10.0f), "Filtering and search radius s")
+		("importance,m", po::value<float>(&m)->default_value(1.0f), "Spital importance m")
+		("l2,l",po::value<float>(&L2_min)->default_value(10.0f),"minium L2 loss")
+		("dataroot,d",po::value<std::string>(&dataroot)->default_value("C:\\Users\\37952\\Desktop\\000_orig_pcd\\benthi_control_A_D30_centre_filter.pcd"),"data to be segmented")
+		("help,h", "SLIC like Superpixel using PCL Library");
 	try
 	{
 		po::store(po::parse_command_line(argc, argv, opts), vm);
+		po::notify(vm);
 	}
 	catch (...)
 	{
@@ -51,14 +55,11 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	s = vm["s"].as<float>();
-	m = vm["m"].as<float>();
-	L2_min = vm["l2"].as<float>();
 
-	std::cout << "SLIC step using s=" << s << " m=" << m << " L2 min=" << L2_min << std::endl;
+	std::cout << "SLIC step for "<<dataroot<<" using s=" << s << " m=" << m << " L2 min=" << L2_min << std::endl;
 
 	pcl::PointCloud<PoinTL>::Ptr cloud(new pcl::PointCloud<PoinTL>);
-	pcl::io::loadPCDFile("C:\\Users\\37952\\Desktop\\000_orig_pcd\\benthi_control_A_D30_centre_filter.pcd", *cloud);
+	pcl::io::loadPCDFile(dataroot.c_str(), *cloud);
 
 	pcl::PointCloud<PoinTL>::Ptr clusting_center(new pcl::PointCloud<PoinTL>);
 	pcl::PointCloud<pcl::PointXYZL>::Ptr labledcloud(new pcl::PointCloud<pcl::PointXYZL>);
@@ -68,8 +69,8 @@ int main(int argc, char* argv[])
 	clusting.getLabledCloud(labledcloud);
 	clusting.getSeed(clusting_center);
 	
-	float error = Cal_undersegmentation_error(labledcloud, cloud, 26, clusting.getSuperpixelCount(),true);
-	float asa = Cal_Achievable_seg_acc(labledcloud, cloud, 26, clusting.getSuperpixelCount());
+	float error = Cal_undersegmentation_error(labledcloud, cloud,true);
+	float asa = Cal_Achievable_seg_acc(labledcloud, cloud);
 
 	std::cout << "Under-segmentation error is: " << error <<" ASA: "<<asa<< std::endl;
 

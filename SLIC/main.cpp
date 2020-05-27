@@ -65,14 +65,16 @@ int main(int argc, char* argv[])
 	pcl::PointCloud<pcl::PointXYZL>::Ptr labledcloud(new pcl::PointCloud<pcl::PointXYZL>);
 
 	SLIC<PoinTL> clusting(cloud,m,s,L2_min);
+	clock_t clk1, clk2 = clock();
 	clusting.SLIC_superpointcloudclusting();
+	clk1 = clock();
 	clusting.getLabledCloud(labledcloud);
 	clusting.getSeed(clusting_center);
 	
 	float error = Cal_undersegmentation_error(labledcloud, cloud,true);
 	float asa = Cal_Achievable_seg_acc(labledcloud, cloud);
 
-	std::cout << "Under-segmentation error is: " << error <<" ASA: "<<asa<< std::endl;
+	std::cout << "Under-segmentation error is: " << error <<" ASA: "<<asa<<" using time :"<<clk1-clk2<<"ms"<< std::endl;
 
 	pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("SLIC"));
 	int v1(0), v2(1),v3(2);

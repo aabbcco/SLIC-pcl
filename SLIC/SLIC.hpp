@@ -70,7 +70,7 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 	filterClustingSeed();
 	pcl::copyPointCloud(*seed, *new_clusting_center);
 
-	std::vector<int>search_indices;				//for K-nearst search
+	std::vector<int>search_indices;				//for K-means search
 	std::vector<int>::iterator search_iter;
 
 	std::vector<float>point_square_dist;
@@ -79,6 +79,9 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 
 	pcl::KdTreeFLANN<PointTT> kd_tree;
 	kd_tree.setInputCloud(cloud);
+	PointTT pointsearch;				//K nearst search used by new center finding
+	std::vector<int> search(1, 0);
+	std::vector<float>searchdist(1, 0);	//never mind
 	DWORD time, time_end;
 
 	//SLIC step down here
@@ -108,18 +111,22 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 				{
 					slic_dist[*search_iter] = dist_slic;
 					label[*search_iter] = i;
-					x += (*cloud)[*search_iter].x;
-					y += (*cloud)[*search_iter].y;
-					z += (*cloud)[*search_iter].z;
+					x += cloud->points[*search_iter].x;
+					y += cloud->points[*search_iter].y;
+					z += cloud->points[*search_iter].z;
 					count += 1.0f;
 				}
 			}
 			//compute new seed
 			if (count != 0)
 			{
-				(*new_clusting_center)[i].x = x / count;
-				(*new_clusting_center)[i].y = y / count;
-				(*new_clusting_center)[i].z = z / count;
+				pointsearch.x = x / count;
+				pointsearch.y = y / count;
+				pointsearch.z = z / count;
+				kd_tree.nearestKSearch(pointsearch, 1, search, searchdist);				//find new point in center of the superpixel
+				new_clusting_center->points[i].x = cloud->points[search[0]].x;
+				new_clusting_center->points[i].y = cloud->points[search[0]].y;
+				new_clusting_center->points[i].z = cloud->points[search[0]].z;
 			}
 		}
 		//compute L2 norm and SLIC time
@@ -127,9 +134,9 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 		L2 = 0.0f;
 		for (int i = clusting_center->width - 1; i >= 0; i--)
 		{
-			L2 += ((*new_clusting_center)[i].x - (*clusting_center)[i].x)*((*new_clusting_center)[i].x - (*clusting_center)[i].x)
-				+ ((*new_clusting_center)[i].y - (*clusting_center)[i].y)*((*new_clusting_center)[i].y - (*clusting_center)[i].y)
-				+ ((*new_clusting_center)[i].z - (*clusting_center)[i].z)*((*new_clusting_center)[i].z - (*clusting_center)[i].z);
+			L2 += (new_clusting_center->points[i].x - clusting_center->points[i].x)*(new_clusting_center->points[i].x - clusting_center->points[i].x)
+				+ (new_clusting_center->points[i].y - clusting_center->points[i].y)*(new_clusting_center->points[i].y - clusting_center->points[i].y)
+				+ (new_clusting_center->points[i].z - clusting_center->points[i].z)*(new_clusting_center->points[i].z - clusting_center->points[i].z);
 		}
 		std::cout << "literation done,L2= " << L2 << "!! using time: " << int(time_end - time) << "ms" << std::endl;
 	} while (L2 >= L2_min);

@@ -11,10 +11,10 @@
 
 
 template<typename PointTT>
-int getlabelcount(PointTT a)
+int getlabelcount(PointTT &a)
 {
 	int maxcount = 0;
-	for (int i = a->width; i >= 0; i--)
+	for (int i = a->width-1; i >= 0; i--)
 	{
 		if (maxcount < a->points[i].label) maxcount = a->points[i].label;
 	}
@@ -23,7 +23,7 @@ int getlabelcount(PointTT a)
 
 template<typename PointTT>
 
-float Cal_undersegmentation_error(const PointTT a, const PointTT gt,bool is_new=true)
+float Cal_undersegmentation_error(const PointTT &a, const PointTT &gt,bool is_new=true)
 {
 	int supercount = getlabelcount(a);
 	int classcount = getlabelcount(gt);
@@ -81,7 +81,7 @@ float Cal_undersegmentation_error(const PointTT a, const PointTT gt,bool is_new=
 
 
 template<typename PointTT>
-float Cal_Achievable_seg_acc(const PointTT a, const PointTT gt)
+float Cal_Achievable_seg_acc(const PointTT &a, const PointTT &gt)
 {
 	int supercount = getlabelcount(a);
 	int classcount = getlabelcount(gt);

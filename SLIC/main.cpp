@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
 		("search,s", po::value<float>(&s)->default_value(10.0f), "Filtering and search radius s")
 		("importance,m", po::value<float>(&m)->default_value(1.0f), "Spital importance m")
 		("l2,l",po::value<float>(&L2_min)->default_value(10.0f),"minium L2 loss")
-		("dataroot,d",po::value<std::string>(&dataroot)->default_value("C:\\Users\\37952\\Desktop\\000_orig_pcd\\benthi_control_A_D30_centre_filter.pcd"),"data to be segmented")
+		("dataroot,d",po::value<std::string>(&dataroot)->default_value("C:\\Users\\37952\\Desktop\\000_orig_pcd\\benthi_control_A_D14_centre_filters.pcd"),"data to be segmented")
 		("help,h", "SLIC like Superpixel using PCL Library");
 	try
 	{

@@ -9,16 +9,18 @@
 #include<random>
 #include<string>
 #include<boost/program_options.hpp>
+#include<fstream>
 
 #include "evaluation.hpp"
 #include "SLIC.hpp"
 
 namespace po = boost::program_options;
+using namespace std;
 
 
 typedef pcl::PointXYZ	PointT;
 typedef pcl::PointXYZRGB	PointTC;
-typedef pcl::PointXYZL		PoinTL;
+typedef pcl::PointXYZRGBL		PoinTL;
 
 
 
@@ -29,18 +31,18 @@ int main(int argc, char* argv[])
 	float L2_min = 10.0f;
 	std::string dataroot;
 
-	//argparse
+	//argparse`
 	po::options_description opts("All opts");
 	po::variables_map vm;
 	opts.add_options()
-		("search,s", po::value<float>(&s)->default_value(10.0f), "Filtering and search radius s")
+		("search,s", po::value<float>(&s)->default_value(1.0f), "Filtering and search radius s")
 		("importance,m", po::value<float>(&m)->default_value(1.0f), "Spital importance m")
 		("l2,l",po::value<float>(&L2_min)->default_value(10.0f),"minium L2 loss")
-		("dataroot,d",po::value<std::string>(&dataroot)->default_value("C:\\Users\\37952\\Desktop\\000_orig_pcd\\benthi_control_A_D14_centre_filters.pcd"),"data to be segmented")
+		("dataroot,d",po::value<std::string>(&dataroot)->default_value("D:\\data\\s3dis\\S3dis_a1_office17un.pcd"),"data to be segmented")
 		("help,h", "SLIC like Superpixel using PCL Library");
 	try
 	{
-		po::store(po::parse_command_line(argc, argv, opts), vm);
+		po::store(po::parse_config_file("config.cfg", opts), vm);
 		po::notify(vm);
 	}
 	catch (...)
@@ -76,21 +78,22 @@ int main(int argc, char* argv[])
 
 	std::cout << "Under-segmentation error is: " << error <<" ASA: "<<asa<<" using time :"<<clk1-clk2<<"ms"<< std::endl;
 
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr  orig(new pcl::PointCloud<pcl::PointXYZRGB>);
+	pcl::copyPointCloud(*cloud, *orig);
 	pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("SLIC"));
 	int v1(0), v2(1),v3(2);
 	viewer->createViewPort(0, 0, 0.5, 1, v1);
-	viewer->addPointCloud(cloud, "origional cloud", v1);
+	viewer->addPointCloud(orig, "origional cloud", v1);
 	viewer->createViewPort(0.5, 0,1, 1, v2);
 	viewer->addPointCloud(labledcloud,"labled cloud", v2);
 	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "origional cloud", v1);
-	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "labled cloud", v2);
-	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_OPACITY, 0.5, "labled cloud", v2);
+	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "labled cloud", v2);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr center(new pcl::PointCloud<pcl::PointXYZ>);
 	
 	pcl::copyPointCloud(*clusting_center, *center);
 	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> single_color(center, 255, 255, 255);
 	viewer->addPointCloud<pcl::PointXYZ>(center, "clusting center1", v2);
-	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "clusting center1");
+	viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "clusting center1");
 	
 	viewer->spin();
 

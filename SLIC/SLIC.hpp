@@ -87,7 +87,7 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 	//SLIC step down here
 	do
 	{
-		time = GetTickCount();
+		//time = GetTickCount();
 		label = std::vector<int>(cloud->width, 0);
 		slic_dist = std::vector<float>(cloud->width, 1000.0f);
 		pcl::copyPointCloud(*new_clusting_center, *clusting_center);
@@ -97,7 +97,7 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 			//find each point in 2S radius
 			search_indices.clear();
 			point_square_dist.clear();
-			kd_tree.radiusSearch((*clusting_center)[i], 2 * s, search_indices, point_square_dist, 0);
+			kd_tree.radiusSearch((*clusting_center)[i], 2.0f * s, search_indices, point_square_dist, 0);
 			x = y = z = 0.0f; //clear x,y,z
 			count = 0.0f;
 			square_dist_iter = point_square_dist.begin();
@@ -130,7 +130,7 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 			}
 		}
 		//compute L2 norm and SLIC time
-		time_end = GetTickCount();
+		//time_end = GetTickCount();
 		L2 = 0.0f;
 		for (int i = clusting_center->width - 1; i >= 0; i--)
 		{
@@ -138,7 +138,7 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 				+ (new_clusting_center->points[i].y - clusting_center->points[i].y)*(new_clusting_center->points[i].y - clusting_center->points[i].y)
 				+ (new_clusting_center->points[i].z - clusting_center->points[i].z)*(new_clusting_center->points[i].z - clusting_center->points[i].z);
 		}
-		std::cout << "literation done,L2= " << L2 << "!! using time: " << int(time_end - time) << "ms" << std::endl;
+		//std::cout << "literation done,L2= " << L2 << "!! using time: " << int(time_end - time) << "ms" << std::endl;
 	} while (L2 >= L2_min);
 	seed = new_clusting_center;
 	//just to show that its done

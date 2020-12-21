@@ -2,11 +2,22 @@
 #define _SLIC_
 #include<pcl/point_cloud.h>
 #include<pcl/filters/uniform_sampling.h>
+#include<pcl/filters/random_sample.h>
 #include<pcl/kdtree/kdtree_flann.h>
 #include<vector>
 #include<iostream>
 #include<cmath>
 #include<random>
+#include<functional>
+
+using namespace std;
+
+
+template<typename PointTT>
+typename pcl::PointCloud<PointTT>::Ptr UniformSampling(typename pcl::PointCloud<PointTT>::Ptr const cloud,float const s);
+
+template <typename PointTT>
+typename pcl::PointCloud<PointTT>::Ptr RandomSampling(typename pcl::PointCloud<PointTT>::Ptr const cloud,float const nsample);
 
 template<typename PointTT>
 class SLIC
@@ -25,6 +36,9 @@ public:
 	void setS(float s) { this->s = s; }
 	void setL2_min(float L2_min) { this->L2_min = L2_min; }
 	void setInputCloud(pcl::PointCloud<PointTT> &cloud) { this->cloud = cloud; }
+	
+//	template<typename F>
+//	void setSamplingFunc(F& func){sampling = func;}
 
 	//socket out
 	float getM() { return m; }
@@ -45,17 +59,16 @@ private:
 	float L2_min;
 	int superpixelcount;
 
-	typename pcl::PointCloud<PointTT>::ConstPtr cloud;
-	typename pcl::PointCloud<PointTT>::ConstPtr seed;
+	typename pcl::PointCloud<PointTT>::Ptr cloud;
+	typename pcl::PointCloud<PointTT>::Ptr seed;
 	std::vector<std::vector<int>> clusters;
+//	function<typename pcl::PointCloud<PointTT>::Ptr(typename pcl::PointCloud<PointTT>::Ptr const)> sampling;
 
-	float Calculate_SLIC_dist(const PointTT &cloud, float sp_dist);
+	float Calculate_SLIC_dist(const PointTT& cloud, float sp_dist) { return 0; };
 
-	void filterClustingSeed();
 
 	std::vector<int> label;
 };
-
 
 
 template<typename PointTT>
@@ -67,7 +80,7 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 	std::vector<float> slic_dist(cloud->width, 1000.0f);										//slic dist to be compared
 	typename pcl::PointCloud<PointTT>::Ptr clusting_center(new pcl::PointCloud<PointTT>);		//center of each superpixel
 	typename pcl::PointCloud<PointTT>::Ptr new_clusting_center(new pcl::PointCloud<PointTT>);	//to calculate L2 norm
-	filterClustingSeed();
+	this->seed = RandomSampling<PointTT>(this->cloud, 50);
 	pcl::copyPointCloud(*seed, *new_clusting_center);
 
 	std::vector<int>search_indices;				//for K-means search
@@ -85,6 +98,7 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 	DWORD time, time_end;
 
 	//SLIC step down here
+	size_t iter = 0;
 	do
 	{
 		//time = GetTickCount();
@@ -139,11 +153,37 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 				+ (new_clusting_center->points[i].z - clusting_center->points[i].z)*(new_clusting_center->points[i].z - clusting_center->points[i].z);
 		}
 		//std::cout << "literation done,L2= " << L2 << "!! using time: " << int(time_end - time) << "ms" << std::endl;
-	} while (L2 >= L2_min);
+		iter++;
+	} while (L2 >= L2_min || iter<10);
+	cout << iter << endl;
 	seed = new_clusting_center;
 	//just to show that its done
 	std::cout << "clusting done!" << std::endl;
 
+}
+
+
+template<typename PointTT>
+typename pcl::PointCloud<PointTT>::Ptr UniformSampling(typename pcl::PointCloud<PointTT>::Ptr const cloud, float const s)
+{
+	typename pcl::UniformSampling<PointTT>::Ptr filter(new pcl::UniformSampling<PointTT>);
+	typename pcl::PointCloud<PointTT>::Ptr seeds(new pcl::PointCloud<PointTT>);
+	//std::cout << "filter start" << std::endl;
+	filter->setInputCloud(cloud);
+	filter->setRadiusSearch(s);
+	filter->filter(*seeds);
+	return seeds;
+}
+
+template <typename PointTT>
+typename pcl::PointCloud<PointTT>::Ptr RandomSampling(typename pcl::PointCloud<PointTT>::Ptr const cloud,float const nsample)
+{
+	pcl::RandomSample<PointTT> filter;
+	filter.setInputCloud(cloud);
+	filter.setSample(nsample);
+	typename pcl::PointCloud<PointTT>::Ptr ret(new pcl::PointCloud<PointTT>);
+	filter.filter(*ret);
+	return ret;
 }
 
 template <> float SLIC<pcl::PointXYZRGB>::Calculate_SLIC_dist(const pcl::PointXYZRGB &cloud, float sp_dist)
@@ -167,20 +207,6 @@ template <> float SLIC<pcl::PointXYZ>::Calculate_SLIC_dist(const pcl::PointXYZ &
 template <> float SLIC<pcl::PointXYZL>::Calculate_SLIC_dist(const pcl::PointXYZL &cloud, float sp_dist)
 {
 	return std::sqrt(sp_dist)*m / s;
-}
-
-template<typename PointTT>
-void SLIC<PointTT>::filterClustingSeed()
-{
-	typename pcl::UniformSampling<PointTT>::Ptr filter(new pcl::UniformSampling<PointTT>);
-	typename pcl::PointCloud<PointTT>::Ptr seeds(new pcl::PointCloud<PointTT>);
-	//std::cout << "filter start" << std::endl;
-	filter->setInputCloud(cloud);
-	filter->setRadiusSearch(s);
-	filter->filter(*seeds);
-	seed = seeds;
-	superpixelcount = seed->width;
-	std::cout << "number of seed: " << seed->width << std::endl;
 }
 
 template<typename PointTT>

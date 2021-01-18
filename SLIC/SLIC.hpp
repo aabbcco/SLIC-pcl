@@ -61,8 +61,8 @@ private:
 	float L2_min;
 	int superpixelcount;
 
-	typename PointCloud<PointTT>::Ptr cloud;
-	typename PointCloud<PointTT>::Ptr seed;
+	typename pcl::PointCloud<PointTT>::Ptr cloud;
+	typename pcl::PointCloud<PointTT>::Ptr seed;
 	vector<vector<int>> clusters;
 //	function<typename PointCloud<PointTT>::Ptr(typename PointCloud<PointTT>::Ptr const)> sampling;
 	//dsit function,defaults to XYZ
@@ -113,7 +113,7 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 			//find each point in 2S radius
 			search_indices.clear();
 			point_square_dist.clear();
-			kd_tree.radiusSearch((*clusting_center)[i], 2.0d * double(s), search_indices, point_square_dist, 0);//find nearst indices using knn and return the spatical dist
+			kd_tree.radiusSearch(clusting_center->points[i], 2.0 * double(s), search_indices, point_square_dist, 0);//find nearst indices using knn and return the spatical dist
 			x = y = z = 0.0f; //clear x,y,z
 			count = 0.0f;
 			square_dist_iter = point_square_dist.begin();
@@ -176,16 +176,15 @@ void SLIC<PointTT>::SLIC_superpointcloudclusting()
 
 }
 
-
 template<typename PointTT>
 typename PointCloud<PointTT>::Ptr UniformSampling(typename PointCloud<PointTT>::Ptr const cloud, float const s)
 {
-	typename UniformSampling<PointTT>::Ptr filter(new UniformSampling<PointTT>);
+	pcl::UniformSampling<PointTT> filter;
 	typename PointCloud<PointTT>::Ptr seeds(new PointCloud<PointTT>);
 	//cout << "filter start" << endl;
-	filter->setInputCloud(cloud);
-	filter->setRadiusSearch(s);
-	filter->filter(*seeds);
+	filter.setInputCloud(cloud);
+	filter.setRadiusSearch(s);
+	filter.filter(*seeds);
 	return seeds;
 }
 
